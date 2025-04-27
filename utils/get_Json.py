@@ -1,6 +1,5 @@
 import json
 import re
-from clean_Json import cleanJson
 from pathlib import Path
 
 #读取txt文件生成json数据
@@ -9,6 +8,9 @@ from pathlib import Path
 FIELD_PATTERN = re.compile(r'^([A-Z][A-Z0-9])\s+(.*)$')  # 匹配两个大写字母开头或者一个大写一个数字的字段
 MULTI_LINE_FIELDS = {'AU','AF','TI','CT','ID','C1','C3','EM','OI','FU','FX','CR'}  # 定义多行字段，多行字段为带有多行文本的字段值，要一直读取到下一个关键字
 LIST_FIELDS = {'AU','AF','DE','CR'}   #列表存储如作者，引用文献
+
+INPUT_JSONFILE="../data/jsondata/txtJsonData.json"
+OUTPUT_JSONFILE="../data/jsondata/txtJsonData_clean.json"
 
 def extract_info_from_block(block):
     """使用正则表达式提取字段，固定顺序"""
@@ -88,6 +90,26 @@ def read_and_split_file(file_path: str, delimiter: str) -> list:
     except Exception as e:
         print(f"Error processing {file_path}: {str(e)}")
         return []
+
+def cleanJson():
+    # 读取JSON文件
+    with open(INPUT_JSONFILE, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    # 遍历每个条目
+    for entry in data:
+        if "CR" in entry:
+            # 过滤包含"DOI"的引用条目（不区分大小写）
+            filtered_cr = [
+                citation for citation in entry["CR"]
+                if "DOI" in citation.upper()
+            ]
+            entry["CR"] = filtered_cr
+
+    # 保存清洗后的数据（覆盖原文件或保存到新文件）
+    with open(OUTPUT_JSONFILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
 
 
 #自动发现数据文件
