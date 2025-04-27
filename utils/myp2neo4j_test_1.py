@@ -1,5 +1,5 @@
 #from p2neo4j import GraphDatabase
-from neo4j import GraphDatabase, Neo4jConnection
+from neo4j import GraphDatabase
 import json
 import re
 
@@ -46,7 +46,6 @@ def extract_doi(cr_entry):
         "cited_doi": cited_doi
     }
 
-
 """
 PT 出版物类型,AU 作者,AF 作者全名,TI 文献标题,SO 出版物名称
 LA 语种,DT 文献类型,CT 会议标题,CY 会议日期,CL 会议地点
@@ -61,11 +60,11 @@ BP 开始页,EP 结束页,AR 文献编号,DI 数字对象标识符 (DOI),
 PG 页数,WC Web of Science 类别,SC 研究方向,GA 文献传递号
 UT 入藏号,PM PubMed ID,OA 公开访问指示符,DA 生成此报告的日期。
 """
+field_list=["PT","SO","LA","DT","AB","C1","C3","RP",
+            "EM","RI","OI","FU","FX","SN","EI","J9","JI",
+            "WC", "SC","GA","UT","PM","OA"]
+
 def process_paper(tx, paper):
-    # 当前论文的唯一标识优先DOI
-    # 流程介绍：1、获取paper的DI字段的doi，查询现有的引用论文节点，若没有则创建论文节点，若有则替换引文节点为论文节点，保持原有的关系
-    #         2、
-    #
     current_id = paper.get("DI")
     tx.run(
         """
@@ -77,66 +76,95 @@ def process_paper(tx, paper):
         u1=paper["U1"],u2=paper["U2"],pg=paper["PG"]
     )
 
-    tx.run(
-        """
-        MERGE (a:PT {type: $ty})
-        WITH a
-        MATCH (p:Paper {DI: $di})
-        MERGE (p)-[:HAS_PT]->(a)
-        """,
-        ty=paper["TY"],
-        di=current_id
-    )
-
-
-    tx.run(
-        """
-        MERGE (p:Paper {id: $doi})
-        SET p.TI = $ti,p.PT = $pt,p.SO = $so,p.LA = $la,p.DT = $dt,p.CT = $ct,
-            p.CY = $cy,p.CL = $cl,p.DE = $de,p.ID = $id,p.AB = $ab,p.C1 = $c1,
-            p.C3 = $c3,p.RP = $rp,p.EM = $em,p.RI = $ri,p.OI = $oi,p.FU = $fu,
-            p.FX = $fx,p.NR = $nr,p.TC = $tc,p.Z9 = $z9,p.U1 = $u1,p.U2 = $u2,
-            p.PU = $pu,p.PI = $pi,p.PA = $pa,p.SN = $sn,p.EI = $ei,p.J9 = $j9,
-            p.JI = $ji,p.PD = $pd,p.VL = $vl,p.IS = $is_1,p.BP = $bp,p.EP = $ep,
-            p.PG = $pg,p.WC = $wc,p.WE = $we,p.SC = $sc,p.GA = $ga,p.UT = $ut,
-            p.PM = $pm,p.DA = $da
-        """,
-        doi=paper.get("DI"), ti=paper["TI"], pt=paper["PT"], so=paper["SO"], la=paper["LA"],
-        dt=paper["DT"], ct=paper["CT"], cy=paper["CY"], cl=paper["CL"], de=paper["DE"],
-        id=paper["ID"], ab=paper["AB"], c1=paper["C1"], c3=paper["C3"], rp=paper["RP"],
-        em=paper["EM"], ri=paper["RI"], oi=paper["OI"], fu=paper["FU"], fx=paper["FX"],
-        nr=paper["NR"], tc=paper["TC"], z9=paper["Z9"], u1=paper["U1"], u2=paper["U2"],
-        pu=paper["PU"], pi=paper["PI"], pa=paper["PA"], sn=paper["SN"], ei=paper["EI"],
-        j9=paper["J9"], ji=paper["JI"], pd=paper["PD"], py=paper["PY"], vl=paper["VL"],
-        is_1=paper["IS"], bp=paper["BP"], ep=paper["EP"], pg=paper["PG"], wc=paper["WC"],
-        we=paper["WE"], sc=paper["SC"], ga=paper["GA"], ut=paper["UT"], pm=paper["PM"],
-        da=paper["DA"]
-    )
-
-    tx.run(
-        """
-        MERGE (p:Paper {id: $id})
-        SET p.TI = $ti,
-            p.SO = $so
-        """,
-        id=current_id,
-        ti=paper["TI"],
-        so=paper["SO"]
-    )
-
+    for element in field_list:
+        if paper[element]!='empty':
+            params ={"di":current_id,"value":paper[element]}
+            tx.run(
+                f"""
+                MERGE (n:{element} {{{element.lower()}: $value}})
+                WITH n
+                MATCH (p:Paper {{DI: $di}})
+                MERGE (p)-[r:{element}]->(n)
+                """,
+                **params
+            )
+    #AU
     # 处理作者关系
     for author in paper["AU"]:
         tx.run(
             """
             MERGE (a:Author {name: $name})
             WITH a
-            MATCH (p:Paper {id: $id})
-            MERGE (a)-[:WROTE]->(p)
+            MATCH (p:Paper {DI: $di})
+            MERGE (p)-[:HAS_AUTHOR]->(a)
             """,
             name=author.strip(),
-            id=current_id
+            di=current_id
         )
+    #CT 会议标题
+    if paper["CT"] != 'empty':
+        tx.run(
+            """
+            MERGE (c:CT {name: $ct})
+            WITH c
+            MATCH (p:Paper {DI: $di})
+            MERGE (p)-[:HAS_CT]->(c)
+            """,
+            ct=paper["CT"],
+            di=current_id
+        )
+        #CY
+        if paper["CY"] != 'empty':
+            tx.run(
+                """
+                MERGE (c:CY {name: $cy})
+                WITH c
+                MATCH (n:CT {name: $ct})
+                MERGE (n)-[:HAS_CY]->(c)
+                """,
+                cy=paper["CY"],
+                ct=paper["CT"]
+            )
+        #CL
+        if paper["CL"] != 'empty':
+            tx.run(
+                """
+                MERGE (c:CL {name: $cl})
+                WITH c
+                MATCH (n:CT {name: $ct})
+                MERGE (n)-[:HAS_CL]->(c)
+                """,
+                cl=paper["Cl"],
+                ct=paper["CT"]
+            )
 
+    #DE 关键词
+    for kw in paper["DE"]:
+        tx.run(
+            """
+            MERGE (d:DE {key_word: $de})
+            WITH d
+            MATCH (p:Paper {DI: $di})
+            MERGE (p)-[:HAS_DE]->(d)
+            """,
+            de=kw.strip(),
+            di=current_id
+        )
+    #ID kw plus
+    for kwp in paper["ID"]:
+        if(kwp!='empty'):
+            tx.run(
+                """
+                MERGE (i:ID {key_word_plus: $id_1})
+                WITH i
+                MATCH (p:Paper {DI: $di})
+                MERGE (p)-[:HAS_ID]->(i)
+                """,
+                id_1=kwp.strip(),
+                di=current_id
+            )
+
+    """第二部分"""
     # 处理引用关系
     for cr in paper.get("CR", []):
         cr_info = extract_doi(cr)
@@ -182,7 +210,6 @@ def process_paper(tx, paper):
                 name=cr_info["author"],
                 cite_id=cited_id
             )
-
             # 建立引用关系
             tx.run(
                 """
@@ -203,4 +230,4 @@ def main(json_path):
     driver.close()
 
 if __name__ == "__main__":
-    main("../data/jsondata/txtJsonData_clean.json")
+    main("../data/jsondata/txtJsonData_clean_test.json")

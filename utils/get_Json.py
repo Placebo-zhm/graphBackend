@@ -6,11 +6,11 @@ from pathlib import Path
 
 # 使用正则表达式提取字段
 FIELD_PATTERN = re.compile(r'^([A-Z][A-Z0-9])\s+(.*)$')  # 匹配两个大写字母开头或者一个大写一个数字的字段
-MULTI_LINE_FIELDS = {'AU','AF','TI','CT','ID','C1','C3','EM','OI','FU','FX','CR'}  # 定义多行字段，多行字段为带有多行文本的字段值，要一直读取到下一个关键字
-LIST_FIELDS = {'AU','AF','DE','CR'}   #列表存储如作者，引用文献
+MULTI_LINE_FIELDS = {'AU','AF','TI','CT','C1','C3','EM','OI','FU','FX','CR'}  # 定义多行字段，多行字段为带有多行文本的字段值，要一直读取到下一个关键字
+LIST_FIELDS = {'AU','AF','DE','ID','CR'}   #列表存储如作者，引用文献
 
-INPUT_JSONFILE="../data/jsondata/txtJsonData.json"
-OUTPUT_JSONFILE="../data/jsondata/txtJsonData_clean.json"
+INPUT_JSONFILE="../data/jsondata/txtJsonData_test.json"
+OUTPUT_JSONFILE="../data/jsondata/txtJsonData_clean_test.json"
 
 def extract_info_from_block(block):
     """使用正则表达式提取字段，固定顺序"""
@@ -21,7 +21,7 @@ def extract_info_from_block(block):
                 "CR","NR","TC","Z9","U1","U2","PU",
                 "PI","PA","SN","EI","J9","JI","PD",
                 "PY","VL","IS","BP","EP","DI","PG",
-                "WC","WE", "SC","GA","UT","PM","DA"]
+                "WC","WE", "SC","GA","UT","PM","OA","DA"]
     info = {field: [] for field in field_list}
     current_field = None
 
@@ -49,7 +49,7 @@ def extract_info_from_block(block):
         # 多行字段用空格连接，单行字段取第一个值
         if k in LIST_FIELDS:
             # 直接保存列表，过滤空值
-            if k == 'DE':
+            if k == 'DE'or k== 'ID':
                 # 合并后按中文分号分割
                 combined = " ".join(v)
                 processed[k] = [s.strip() for s in combined.split(";") if s.strip()]
@@ -122,21 +122,21 @@ def cleanJson():
 
 
 # 主函数
-def main(output_file: str = "../data/jsondata/txtJsonData.json"):
+def main(output_file: str = "../data/jsondata/txtJsonData_test.json"):
     # 自动发现数据文件
     #files = find_data_files()
     # 手动添加数据文件
     files = [
-        '../data/txtdata/data1.txt',
-        '../data/txtdata/data2.txt',
-        '../data/txtdata/data3.txt',
-        '../data/txtdata/data4.txt',
-        '../data/txtdata/data5.txt',
-        '../data/txtdata/data6.txt',
-        '../data/txtdata/data7.txt',
-        '../data/txtdata/data8.txt',
-        '../data/txtdata/data9.txt',
-        '../data/txtdata/data10.txt',
+        # '../data/txtdata/data1.txt',
+        # '../data/txtdata/data2.txt',
+        # '../data/txtdata/data3.txt',
+        # '../data/txtdata/data4.txt',
+        # '../data/txtdata/data5.txt',
+        # '../data/txtdata/data6.txt',
+        # '../data/txtdata/data7.txt',
+        # '../data/txtdata/data8.txt',
+        # '../data/txtdata/data9.txt',
+        # '../data/txtdata/data10.txt',
         '../data/txtdata/data11.txt'
     ]
     if not files:
