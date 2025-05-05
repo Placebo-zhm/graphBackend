@@ -1,12 +1,12 @@
 import json
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
-import torch
-import torch.nn.functional as F
 from torch_geometric.data import Data
 from torch_geometric.nn import GCNConv
-from torch_geometric.utils import train_test_split_edges
+from torch_geometric.utils import negative_sampling
+import torch.nn.functional as F
 
 
 # 1. 数据预处理
@@ -14,7 +14,7 @@ def load_data(filename):
     with open(filename) as f:
         data = json.load(f)
 
-    # 收集所有唯一的节点
+    # 收集所有唯一节点
     nodes = set()
     edges = []
     for entry in data:
@@ -25,121 +25,133 @@ def load_data(filename):
             edges.append((source, target, weight))
 
     # 创建节点到索引的映射
-    node_list = list(nodes)
-    node2idx = {node: idx for idx, node in enumerate(node_list)}
-    num_nodes = len(node_list)
+    nodes = list(nodes)
+    node_idx = {node: i for i, node in enumerate(nodes)}
 
-    # 创建边索引和边属性（确保形状正确）
+    # 构建边索引和边属性
     edge_index = []
     edge_attr = []
-    for src, dst, _ in edges:
-        edge_index.append([node2idx[src], node2idx[dst]])  # 添加边索引
+    for src, tgt, w in edges:
+        edge_index.append([node_idx[src], node_idx[tgt]])
+        edge_attr.append(float(w))
 
-    # 转换为张量并调整形状
-    edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()  # 关键修复
-    edge_attr = torch.tensor([w for _, _, w in edges], dtype=torch.float).view(-1, 1)
+    # 转换为PyG数据格式
+    edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+    edge_attr = torch.tensor(edge_attr, dtype=torch.float).view(-1, 1)
+    x = torch.ones(len(nodes), 1)  # 初始化节点特征
 
-    # 构建PyG Data对象
-    data = Data(
-        x=torch.randn(num_nodes, 16),  # 随机初始化节点特征
-        edge_index=edge_index,
-        edge_attr=edge_attr
-    )
-    return data, node2idx
+    return Data(x=x, edge_index=edge_index, edge_attr=edge_attr), nodes
 
 
 # 2. 定义GNN模型
-class GCNEncoder(torch.nn.Module):
-    def __init__(self, in_channels, out_channels):
+class GNN(torch.nn.Module):
+    def __init__(self, in_dim, hidden_dim, out_dim):
         super().__init__()
-        self.conv1 = GCNConv(in_channels, 128)
-        self.conv2 = GCNConv(128, out_channels)
+        self.conv1 = GCNConv(in_dim, hidden_dim)
+        self.conv2 = GCNConv(hidden_dim, out_dim)
 
     def forward(self, x, edge_index):
-        x = self.conv1(x, edge_index).relu()
-        return self.conv2(x, edge_index)
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = self.conv2(x, edge_index)
+        return x
 
 
+# 3. 链路预测模型
 class LinkPredictor(torch.nn.Module):
-    def __init__(self, in_channels):
+    def __init__(self, in_dim):
         super().__init__()
-        self.lin1 = torch.nn.Linear(2 * in_channels, 128)
-        self.lin2 = torch.nn.Linear(128, 1)
+        self.lin = torch.nn.Linear(in_dim * 2, 1)
 
     def forward(self, z, edge_index):
-        src = z[edge_index[0]]
-        dst = z[edge_index[1]]
-        out = torch.cat([src, dst], dim=1)
-        out = self.lin1(out).relu()
-        return self.lin2(out)
+        src, dst = edge_index
+        return (z[src] * z[dst]).sum(dim=-1)
 
 
-# 3. 训练函数
+# 4. 训练函数
 def train(model, predictor, data, optimizer):
     model.train()
     predictor.train()
+
+    # 生成负样本
+    neg_edge_index = negative_sampling(
+        edge_index=data.edge_index,
+        num_nodes=data.num_nodes,
+        num_neg_samples=data.edge_index.size(1)
+    )
+
     optimizer.zero_grad()
 
+    # 获取节点嵌入
     z = model(data.x, data.edge_index)
-    pos_pred = predictor(z, data.train_pos_edge_index)
-    neg_pred = predictor(z, data.train_neg_edge_index)
 
-    pos_loss = F.binary_cross_entropy_with_logits(pos_pred, torch.ones_like(pos_pred))
-    neg_loss = F.binary_cross_entropy_with_logits(neg_pred, torch.zeros_like(neg_pred))
+    # 计算正负样本得分
+    pos_out = predictor(z, data.edge_index)
+    neg_out = predictor(z, neg_edge_index)
+
+    # 计算损失
+    pos_loss = F.binary_cross_entropy_with_logits(pos_out, torch.ones_like(pos_out))
+    neg_loss = F.binary_cross_entropy_with_logits(neg_out, torch.zeros_like(neg_out))
     loss = pos_loss + neg_loss
+
     loss.backward()
     optimizer.step()
     return loss.item()
 
 
-# 4. 主程序
+# 5. 可视化函数
+def visualize(z, labels):
+    z = z.detach().cpu().numpy()
+    tsne = TSNE(n_components=2, perplexity=30, n_iter=1000)
+    z_2d = tsne.fit_transform(z)
+
+    plt.figure(figsize=(10, 8))
+    plt.scatter(z_2d[:, 0], z_2d[:, 1], s=50)
+    for i, label in enumerate(labels):
+        plt.annotate(label, (z_2d[i, 0], z_2d[i, 1]), fontsize=8)
+    plt.title("Node Embeddings Visualization")
+    plt.show()
+
+
+# 主程序
 def main():
     # 加载数据
-    data, node2idx = load_data("../data/jsondata/keyword_citation_count.json")
-
-    # 划分训练/测试边
-    data = train_test_split_edges(data, val_ratio=0.05, test_ratio=0.1)
+    data, nodes = load_data("../data/jsondata/keyword_citation_count.json")
 
     # 初始化模型
-    model = GCNEncoder(in_channels=16, out_channels=64)
-    predictor = LinkPredictor(in_channels=64)
+    model = GNN(in_dim=1, hidden_dim=128, out_dim=64)
+    predictor = LinkPredictor(64)
     optimizer = torch.optim.Adam(
-        list(model.parameters()) + list(predictor.parameters()), lr=0.01)
+        list(model.parameters()) + list(predictor.parameters()),
+        lr=0.01
+    )
 
-    # 训练循环
+    # 训练
     for epoch in range(1, 201):
         loss = train(model, predictor, data, optimizer)
         if epoch % 20 == 0:
-            print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}')
+            print(f"Epoch: {epoch:03d}, Loss: {loss:.4f}")
 
     # 保存模型
     torch.save({
-        'model_state': model.state_dict(),
-        'predictor_state': predictor.state_dict()
-    }, 'gnn_model.pth')
+        "model_state": model.state_dict(),
+        "predictor_state": predictor.state_dict()
+    }, "gnn_model.pth")
 
-    # 提取嵌入
+    # 生成嵌入并可视化
     with torch.no_grad():
-        embeddings = model(data.x, data.edge_index).numpy()
-
-    # 降维可视化
-    tsne = TSNE(n_components=2, perplexity=30, n_iter=300)
-    embeddings_2d = tsne.fit_transform(embeddings)
-
-    plt.figure(figsize=(10, 8))
-    plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], s=10)
-    plt.title("Node Embeddings Visualization")
-    plt.savefig("embeddings.png")
-    plt.close()
+        z = model(data.x, data.edge_index)
+    visualize(z, nodes)
 
 
-# 5. 加载模型函数
+# 加载模型的函数
 def load_model():
-    model = GCNEncoder(16, 64)
+    checkpoint = torch.load("gnn_model.pth")
+    model = GNN(1, 128, 64)
     predictor = LinkPredictor(64)
-    checkpoint = torch.load('gnn_model.pth')
-    model.load_state_dict(checkpoint['model_state'])
-    predictor.load_state_dict(checkpoint['predictor_state'])
+    model.load_state_dict(checkpoint["model_state"])
+    predictor.load_state_dict(checkpoint["predictor_state"])
     return model, predictor
 
 

@@ -15,6 +15,8 @@ def find_citation_relations(data):
     for paper in data:
         doi_map.append(paper['DI'])
     for paper in data:
+        if paper["DI"]=='empty':
+            continue
         current_di = paper["DI"]
         cited_dois = []
 
@@ -28,6 +30,7 @@ def find_citation_relations(data):
         results.append({
             "doi": current_di,
             "cited_dois": cited_dois,
+            "authors": paper["AU"],
             "keywords": paper["keywords"]
         })
         print(f"\nChecking citations for: {current_di}")

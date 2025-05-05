@@ -127,16 +127,16 @@ def main(output_file: str = "../data/jsondata/txtJsonData_test.json"):
     #files = find_data_files()
     # 手动添加数据文件
     files = [
-        # '../data/txtdata/data1.txt',
-        # '../data/txtdata/data2.txt',
-        # '../data/txtdata/data3.txt',
-        # '../data/txtdata/data4.txt',
-        # '../data/txtdata/data5.txt',
-        # '../data/txtdata/data6.txt',
-        # '../data/txtdata/data7.txt',
-        # '../data/txtdata/data8.txt',
-        # '../data/txtdata/data9.txt',
-        # '../data/txtdata/data10.txt',
+        '../data/txtdata/data1.txt',
+        '../data/txtdata/data2.txt',
+        '../data/txtdata/data3.txt',
+        '../data/txtdata/data4.txt',
+        '../data/txtdata/data5.txt',
+        '../data/txtdata/data6.txt',
+        '../data/txtdata/data7.txt',
+        '../data/txtdata/data8.txt',
+        '../data/txtdata/data9.txt',
+        '../data/txtdata/data10.txt',
         '../data/txtdata/data11.txt'
     ]
     if not files:

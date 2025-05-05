@@ -40,7 +40,7 @@ def process_keywords(input_file):
 
 if __name__ == '__main__':
     # 输入参数
-    input_json = "../data/jsondata/modified.json"
+    input_json = "../data/jsondata/random_kw.json"
     output_json = "../data/jsondata/keyword_nodes.json"
 
     # 执行处理

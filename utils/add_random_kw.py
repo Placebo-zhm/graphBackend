@@ -102,14 +102,69 @@ keywords = ["visualization",
       "performance evaluation",
       "sports",
       "standards",
-      "surface reconstruction"]
+      "surface reconstruction",
+      "transformer",
+      "urban areas",
+      "accuracy",
+      "atmospheric measurements",
+      "complexity theory",
+      "computer vision",
+      "decision making",
+      "design study",
+      "documentation",
+      "evaluation",
+      "eye tracking",
+      "light fields",
+      "media",
+      "natural languages",
+      "particle measurements",
+      "physiology",
+      "point cloud",
+      "prototypes",
+      "scalability",
+      "stress",
+      "switches",
+      "text entry",
+      "topological data analysis",
+      "virtual",
+      "application motivated visualization",
+      "augmented",
+      "awards",
+      "benchmark testing",
+      "bit error rate",
+      "brain modeling",
+      "computer architecture",
+      "cultural differences",
+      "dataset",
+      "dentistry",
+      "depth perception",
+      "differentiable rendering",
+      "dynamics",
+      "education",
+      "haptics",
+      "human-centered computing",
+      "image restoration",
+      "image synthesis",
+      "judgment",
+      "kernel",
+      "lenses",
+      "maintenance engineering",
+      "manuals",
+      "merging",
+      "neurons",
+      "noise reduction",
+      "reinforcement learning",
+      "reliability",
+      "robustness",
+      "semantic segmentation"
+      ]
 
 # 读取并解析JSON数据
 with open("../data/jsondata/txtJsonData_clean.json", "r", encoding="utf-8") as f:
     data = json.load(f)
 
 for entry in data:
-    # 随机选择4-5个不重复的关键词
+    # 随机选择3-6个不重复的关键词
     k = random.randint(3, 6)
     selected_keywords = random.sample(keywords, k)
     entry["keywords"] = selected_keywords

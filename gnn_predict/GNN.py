@@ -59,7 +59,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 criterion = torch.nn.MSELoss()
 
 model.train()
-for epoch in range(500):
+for epoch in range(200):
     optimizer.zero_grad()
     embeddings = model(graph_data.x, graph_data.edge_index)
     # 使用边权重重建任务进行训练
