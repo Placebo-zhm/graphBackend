@@ -160,7 +160,7 @@ keywords = ["visualization",
       ]
 
 # 读取并解析JSON数据
-with open("../data/jsondata/txtJsonData_clean.json", "r", encoding="utf-8") as f:
+with open("../data/jsondata/txtJsonData_clean_test.json", "r", encoding="utf-8") as f:
     data = json.load(f)
 
 for entry in data:

@@ -15,15 +15,24 @@ class Neo4jImporter:
 
     def import_data(self, data):
         with self.driver.session() as session:
+            count=1
             for paper in data:
                 # 创建论文节点
                 session.execute_write(self._create_paper, paper)
                 # 处理作者关系
                 session.execute_write(self._link_authors, paper)
+                # 处理会议
+                session.execute_write(self._link_so, paper)
                 # 处理关键词关系
                 session.execute_write(self._link_keywords, paper)
+                # 处理组织
+                session.execute_write(self._link_c3, paper)
+                # 处理年份
+                session.execute_write(self._link_py, paper)
                 # 处理引用关系
                 session.execute_write(self._link_citations, paper)
+                print(count)
+                count+=1
 
     @staticmethod
     def _create_paper(tx, paper):
@@ -41,6 +50,15 @@ class Neo4jImporter:
             """, name=author, doi=paper["doi"])
 
     @staticmethod
+    def _link_so(tx, paper):
+        tx.run("""
+            MERGE (s:SO {name: $so})
+            WITH s
+            MATCH (p:Paper {doi: $doi})
+            MERGE (p)-[:so]->(s)
+        """, so=paper["so"], doi=paper["doi"])
+
+    @staticmethod
     def _link_keywords(tx, paper):
         for keyword in paper["keywords"]:
             # 创建关键词节点并建立关系
@@ -50,6 +68,28 @@ class Neo4jImporter:
                 MATCH (p:Paper {doi: $doi})
                 MERGE (p)-[:KW]->(k)
             """, name=keyword.lower(), doi=paper["doi"])
+
+    @staticmethod
+    def _link_c3(tx, paper):
+        for org in paper["c3"]:
+            if org=='empty':
+                break
+            # 创建关键词节点并建立关系
+            tx.run("""
+                    MERGE (c:C3 {name: $name})
+                    WITH c
+                    MATCH (p:Paper {doi: $doi})
+                    MERGE (p)-[:C3]->(c)
+                """, name=org, doi=paper["doi"])
+
+    @staticmethod
+    def _link_py(tx, paper):
+        tx.run("""
+            MERGE (y:PY {year: $year})
+            WITH y
+            MATCH (p:Paper {doi: $doi})
+            MERGE (p)-[:PY]->(y)
+        """, year=paper["py"], doi=paper["doi"])
 
     @staticmethod
     def _link_citations(tx, paper):
@@ -64,7 +104,7 @@ class Neo4jImporter:
 
 if __name__ == "__main__":
     # 读取JSON数据
-    with open("../data/jsondata/citation_relations.json", "r") as f:
+    with open("../data/jsondata/citation_relations.json", "r",encoding='utf-8') as f:
         data = json.load(f)
 
     # 连接并导入数据

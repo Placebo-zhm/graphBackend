@@ -7,7 +7,7 @@ from pathlib import Path
 # 使用正则表达式提取字段
 FIELD_PATTERN = re.compile(r'^([A-Z][A-Z0-9])\s+(.*)$')  # 匹配两个大写字母开头或者一个大写一个数字的字段
 MULTI_LINE_FIELDS = {'AU','AF','TI','CT','C1','C3','EM','OI','FU','FX','CR'}  # 定义多行字段，多行字段为带有多行文本的字段值，要一直读取到下一个关键字
-LIST_FIELDS = {'AU','AF','DE','ID','CR'}   #列表存储如作者，引用文献
+LIST_FIELDS = {'AU','AF','DE','ID','C3','CR'}   #列表存储如作者，引用文献
 
 INPUT_JSONFILE="../data/jsondata/txtJsonData_test.json"
 OUTPUT_JSONFILE="../data/jsondata/txtJsonData_clean_test.json"
@@ -49,7 +49,7 @@ def extract_info_from_block(block):
         # 多行字段用空格连接，单行字段取第一个值
         if k in LIST_FIELDS:
             # 直接保存列表，过滤空值
-            if k == 'DE'or k== 'ID':
+            if k == 'DE'or k== 'ID' or k== 'C3':
                 # 合并后按中文分号分割
                 combined = " ".join(v)
                 processed[k] = [s.strip() for s in combined.split(";") if s.strip()]

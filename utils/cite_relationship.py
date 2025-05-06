@@ -28,10 +28,14 @@ def find_citation_relations(data):
                 found = True
 
         results.append({
+            "ti": paper["TI"],
             "doi": current_di,
+            "so":paper["SO"],
             "cited_dois": cited_dois,
             "authors": paper["AU"],
-            "keywords": paper["keywords"]
+            "keywords": [keyword.lower() for keyword in paper["DE"]],
+            "c3": paper["C3"],
+            "py": paper["PY"]
         })
         print(f"\nChecking citations for: {current_di}")
         if cited_dois:
@@ -44,7 +48,7 @@ def find_citation_relations(data):
     return results
 
 if __name__ == "__main__":
-    with open("../data/jsondata/random_kw.json", "r", encoding="utf-8") as f:
+    with open("../data/jsondata/txtJsonData_clean_test.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
     print("=== Simplified Citation Report ===")
